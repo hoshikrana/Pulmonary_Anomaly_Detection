@@ -47,14 +47,14 @@ BATCH_SIZE   = 32
 NUM_WORKERS  = 2
 PIN_MEMORY   = True
 
-LEARNING_RATE           = 1e-3
-WEIGHT_DECAY            = 1e-5
+LEARNING_RATE           = 0.1
+WEIGHT_DECAY            = 0.1
 EPOCHS                  = 100
 EARLY_STOP_PATIENCE     = 8
 LR_SCHEDULER_PATIENCE   = 4
 LR_SCHEDULER_FACTOR     = 0.5
 
-VAL_SPLIT    = 0.1
+VAL_SPLIT    = 0.2
 SEED         = 42
 
 # ------------------------------------------------------------------
