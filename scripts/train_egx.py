@@ -17,36 +17,58 @@ EGX adds:
 Run:  python scripts/train_egx.py
 """
 
+import os
+import sys
+
+# Ensure the project root is in the Python path before importing config
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import config
-from src.utils      import set_seed, print_device_info, get_logger
+from src.utils      import set_seed, print_device_info
 from src.data       import get_dataloaders
 from src.model      import ConvAutoencoder
 from src.training   import EGXAutoencoderTrainer
 from src.evaluation import plot_training_curves
 
-logger = get_logger(__name__, log_dir=config.OUTPUT_DIR + "/logs")
-
 
 def main():
+    print("\n" + "=" * 70)
+    print("  PULMONARY ANOMALY DETECTION - EGX TRAINING SCRIPT")
+    print("=" * 70)
+    print("  Powered by Elastic Guardian X (EGX) Framework")
+    print("  Features: Hardware optimization, Mixed precision, Self-healing")
+    print(f"  Random Seed: {config.SEED}")
+    print("=" * 70)
+
     set_seed(config.SEED)
     config.print_config()
     print_device_info()
 
-    logger.info("[EGX] Loading data...")
+    print("\n[1/4] Loading datasets...")
     train_loader, val_loader, _ = get_dataloaders()
 
-    logger.info("[EGX] Building model...")
-    model        = ConvAutoencoder(latent_dim=config.LATENT_DIM)
+    print("\n[2/4] Building autoencoder model...")
+    model = ConvAutoencoder(latent_dim=config.LATENT_DIM)
     total_params = sum(p.numel() for p in model.parameters())
-    logger.info(f"[EGX] Parameters: {total_params:,} (~{total_params * 4 / 1e6:.1f} MB)")
+    print(f"✓ Model created with {total_params:,} parameters (~{total_params * 4 / 1e6:.1f} MB)")
 
-    logger.info("[EGX] Starting EGX-powered training...")
+    print("\n[3/4] Initializing EGX-powered trainer...")
     trainer = EGXAutoencoderTrainer(model, train_loader, val_loader)
+    print("✓ EGX trainer ready with production-grade features")
+
+    print("\n[4/4] Starting EGX-powered training...")
     history = trainer.fit()
 
-    # Use shared visualiser — same outputs as vanilla training
+    print("\n[5/5] Generating training curves...")
     plot_training_curves(history)
-    logger.info(f"[EGX] Best model saved: {config.BEST_MODEL_PATH}")
+    print(f"✓ Training curves saved to {config.OUTPUT_DIR}")
+    print(f"✓ Best model saved to {config.BEST_MODEL_PATH}")
+
+    print("\n" + "=" * 70)
+    print("  EGX TRAINING SCRIPT COMPLETED SUCCESSFULLY")
+    print("=" * 70)
 
 
 if __name__ == "__main__":

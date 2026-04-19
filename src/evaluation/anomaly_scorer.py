@@ -18,9 +18,7 @@ from tqdm import tqdm
 
 import config
 from src.model import ConvAutoencoder
-from src.utils import get_device, get_logger
-
-logger = get_logger(__name__)
+from src.utils import get_device
 
 
 class AnomalyScorer:
@@ -60,7 +58,7 @@ class AnomalyScorer:
 
         normal_mean  = scores[labels == 0].mean() if (labels == 0).any() else float("nan")
         anomaly_mean = scores[labels == 1].mean() if (labels == 1).any() else float("nan")
-        logger.info(f"{desc}: {len(scores)} images | "
+        print(f"{desc}: {len(scores)} images | "
                     f"normal mean={normal_mean:.5f} | anomaly mean={anomaly_mean:.5f}")
 
         return scores, labels
@@ -100,5 +98,5 @@ class AnomalyScorer:
 
         vectors = np.concatenate(all_vectors).astype(np.float32)
         labels  = np.concatenate(all_labels).astype(np.int32)
-        logger.info(f"Extracted {vectors.shape[0]} latent vectors (dim={vectors.shape[1]})")
+        print(f"Extracted {vectors.shape[0]} latent vectors (dim={vectors.shape[1]})")
         return vectors, labels

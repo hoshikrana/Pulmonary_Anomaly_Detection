@@ -13,10 +13,15 @@ Outputs (outputs/):
 import os
 import sys
 
+# Ensure the project root is in the Python path before importing config
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import torch
 
 import config
-from src.utils      import set_seed, print_device_info, get_logger, get_device
+from src.utils      import set_seed, print_device_info, get_device
 from src.data       import get_dataloaders
 from src.model      import ConvAutoencoder
 from src.evaluation import (
@@ -24,45 +29,66 @@ from src.evaluation import (
     save_all_evaluation_figures, plot_reconstruction_grid, plot_heatmap_examples,
 )
 
-logger = get_logger(__name__, log_dir=config.OUTPUT_DIR + "/logs")
-
 
 def main():
+    print("\n" + "=" * 70)
+    print("  PULMONARY ANOMALY DETECTION - EVALUATION SCRIPT")
+    print("=" * 70)
+    print(f"  Random Seed: {config.SEED}")
+    print("=" * 70)
+
     set_seed(config.SEED)
     print_device_info()
 
+    print("\n[1/6] Checking for trained model...")
     if not os.path.exists(config.BEST_MODEL_PATH):
-        logger.error(f"No checkpoint at {config.BEST_MODEL_PATH}. Run train.py first.")
+        print(f"❌ ERROR: No checkpoint found at {config.BEST_MODEL_PATH}")
+        print("   Please run training first: python scripts/train.py --egx")
         sys.exit(1)
+    print(f"✓ Found model checkpoint: {config.BEST_MODEL_PATH}")
 
-    logger.info(f"Loading model from {config.BEST_MODEL_PATH}")
-    model  = ConvAutoencoder.load(config.BEST_MODEL_PATH, device=get_device())
+    print("\n[2/6] Loading trained model...")
+    model = ConvAutoencoder.load(config.BEST_MODEL_PATH, device=get_device())
+    print("✓ Model loaded successfully")
+
+    print("\n[3/6] Initializing anomaly scorer...")
     scorer = AnomalyScorer(model)
+    print("✓ Anomaly scorer ready")
 
-    logger.info("Loading test data...")
+    print("\n[4/6] Loading test dataset...")
     _, _, test_loader = get_dataloaders()
+    print("✓ Test data loaded")
 
-    logger.info("Scoring test set...")
+    print("\n[5/6] Scoring test set...")
     scores, labels = scorer.score_loader(test_loader, desc="Test")
+    print(f"✓ Scored {len(scores)} test samples")
 
-    logger.info("Computing metrics...")
+    print("\n[6/6] Computing evaluation metrics...")
     result = compute_metrics(scores, labels)
+    print("✓ Metrics computed")
+
+    print("\n[Saving] Metrics CSV...")
     save_metrics_csv(result, path=os.path.join(config.OUTPUT_DIR, "metrics.csv"))
+    print("✓ Metrics saved to CSV")
 
-    # Save percentile-based thresholds to disk — loaded by web app at startup
+    print("\n[Saving] Thresholds for inference...")
     save_thresholds(result)
+    print("✓ Thresholds saved for web app")
 
-    # Visual outputs
-    logger.info("Generating figures...")
+    print("\n[Generating] Evaluation figures...")
     _save_image_grids(model, test_loader)
     vectors, lat_labels = scorer.extract_latent_vectors(test_loader)
     save_all_evaluation_figures(result, vectors, lat_labels)
+    print("✓ All figures generated")
 
-    logger.info(
-        f"\nDone. AUC-ROC={result.auc_roc:.4f}  "
-        f"AUC-PR={result.auc_pr:.4f}  F1={result.f1:.4f}"
-    )
-    logger.info(f"All outputs in: {config.OUTPUT_DIR}")
+    print("\n" + "=" * 70)
+    print("  EVALUATION COMPLETED")
+    print("=" * 70)
+    print(f"  AUC-ROC: {result.auc_roc:.4f}")
+    print(f"  AUC-PR:  {result.auc_pr:.4f}")
+    print(f"  F1 Score: {result.f1:.4f}")
+    print(f"  All outputs saved to: {config.OUTPUT_DIR}")
+    print("=" * 70)
 
 
 def _save_image_grids(model, test_loader):

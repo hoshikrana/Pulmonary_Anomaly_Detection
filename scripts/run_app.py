@@ -6,6 +6,13 @@ Prod: gunicorn "app:create_app()" --bind 0.0.0.0:5000 --workers 1
 """
 
 import os
+import sys
+
+# Ensure the project root is in the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from app import create_app
 
 if __name__ == "__main__":

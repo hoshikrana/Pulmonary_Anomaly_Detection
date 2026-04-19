@@ -25,9 +25,6 @@ from matplotlib.colors import LinearSegmentedColormap
 import torch
 
 import config
-from src.utils import get_logger
-
-logger = get_logger(__name__)
 
 plt.rcParams.update({
     "font.family":       "DejaVu Sans",
@@ -55,7 +52,7 @@ def _save(fig: plt.Figure, filename: str) -> str:
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
     fig.savefig(path)
     plt.close(fig)
-    logger.info(f"Saved: {path}")
+    print(f"Saved: {path}")
     return path
 
 
@@ -194,7 +191,7 @@ def plot_latent_space(vectors: np.ndarray, labels: np.ndarray,
 
     if method == "tsne":
         from sklearn.manifold import TSNE
-        logger.info("Running t-SNE (1-2 min)...")
+        print("Running t-SNE (1-2 min)...")
         embedded = TSNE(n_components=2, random_state=config.SEED,
                         perplexity=30, n_iter=1000).fit_transform(scaled)
         title = "Latent Space — t-SNE 2D Projection"
@@ -276,5 +273,5 @@ def save_all_evaluation_figures(result,
         paths.append(plot_latent_space(vectors, labels, method="tsne"))
         paths.append(plot_latent_space(vectors, labels, method="pca"))
 
-    logger.info(f"All figures saved to: {config.OUTPUT_DIR}")
+    print(f"All figures saved to: {config.OUTPUT_DIR}")
     return paths

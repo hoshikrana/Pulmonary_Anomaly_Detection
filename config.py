@@ -49,7 +49,7 @@ PIN_MEMORY   = True
 
 LEARNING_RATE           = 1e-3
 WEIGHT_DECAY            = 1e-5
-EPOCHS                  = 50
+EPOCHS                  = 100
 EARLY_STOP_PATIENCE     = 8
 LR_SCHEDULER_PATIENCE   = 4
 LR_SCHEDULER_FACTOR     = 0.5

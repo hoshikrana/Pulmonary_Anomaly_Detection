@@ -26,8 +26,8 @@ def print_device_info() -> None:
         print(f"[Device] GPU    : {props.name}")
         print(f"[Device] Memory : {used:.2f} GB used / {total:.1f} GB total")
     else:
-        print("[Device] No GPU found — running on CPU.")
-        print("[Device] Tip: Enable GPU in Colab → Runtime → Change runtime type → T4 GPU")
+        print("[Device] No GPU found - running on CPU.")
+        print("[Device] Tip: Enable GPU in Colab -> Runtime -> Change runtime type -> T4 GPU")
 
 
 def move_to_device(obj, device: torch.device = None):

@@ -4,42 +4,24 @@ src/training/egx_trainer.py
 EGX-Powered Trainer for Pulmonary Anomaly Detection.
 
 Integrates the EGX (Elastic Guardian X) framework to bring production-grade
-training features to the autoencoder pipeline:
-
-  ✓ Automatic hardware probing & device selection
-  ✓ Mixed precision (FP16/BF16) based on GPU capability
-  ✓ Self-healing checkpointing with atomic writes
-  ✓ NaN/Inf detection with automatic recovery
-  ✓ Callback-driven lifecycle hooks
-  ✓ Gradient clipping via EGX kernel
-  ✓ Early stopping with configurable patience
-  ✓ Production-grade logging with throughput metrics
-  ✓ Recovery FSM for OOM and runtime errors
-
-The autoencoder uses a custom training_step_fn because EGX's default
-kernel expects dict-based batches (HuggingFace style), while our
-DataLoader yields (images, labels) tuples for the convolutional
-autoencoder reconstruction task.
+training features to the autoencoder pipeline.
 """
 
 import os
 import sys
 import time
-import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 import config
-from src.utils import get_logger, get_device
+from src.utils import get_device
 from src.training.loss import get_loss_fn
 from src.training.callbacks import ModelCheckpoint, LRSchedulerCallback
 
 # ── EGX Imports ──────────────────────────────────────────────────────
-# EGX is installed from E:\Project\EGX via `pip install -e E:\Project\EGX`
 from egx.api.trainer import EGXTrainer
 from egx.api.config import EGXConfig
 from egx.api.callbacks import (
@@ -50,8 +32,6 @@ from egx.api.callbacks import (
     GradientClipCallback,
 )
 
-logger = get_logger(__name__, log_dir=config.OUTPUT_DIR + "/logs")
-
 
 # ══════════════════════════════════════════════════════════════════════
 #  Custom EGX Callbacks for Autoencoder Training
@@ -61,9 +41,6 @@ logger = get_logger(__name__, log_dir=config.OUTPUT_DIR + "/logs")
 class AutoencoderLoggingCallback(TrainingCallback):
     """
     Rich logging callback tailored for autoencoder reconstruction training.
-
-    Tracks per-epoch train/val loss, learning rate, and timing —
-    matching the format of the original Trainer for consistency.
     """
 
     def __init__(self):
@@ -72,9 +49,9 @@ class AutoencoderLoggingCallback(TrainingCallback):
 
     def on_train_begin(self, trainer, **kwargs):
         self._train_start = time.time()
-        logger.info("=" * 55)
-        logger.info("  EGX Training Session — Pulmonary Anomaly Detection")
-        logger.info("=" * 55)
+        print("=" * 55)
+        print("  EGX Training Session — Pulmonary Anomaly Detection")
+        print("=" * 55)
 
     def on_epoch_begin(self, trainer, epoch, **kwargs):
         self._epoch_start = time.time()
@@ -92,23 +69,19 @@ class AutoencoderLoggingCallback(TrainingCallback):
         if lr is not None:
             parts.append(f"lr={lr:.2e}")
         parts.append(f"({elapsed:.1f}s)")
-        logger.info("  ".join(parts))
+        print("  ".join(parts))
 
     def on_train_end(self, trainer, result, **kwargs):
         total = time.time() - self._train_start
-        logger.info("=" * 55)
-        logger.info(f"  EGX Training Complete — {total / 60:.1f} min total")
-        logger.info(f"  Final loss: {result.get('final_loss', 0):.6f}")
-        logger.info("=" * 55)
+        print("=" * 55)
+        print(f"  EGX Training Complete — {total / 60:.1f} min total")
+        print(f"  Final loss: {result.get('final_loss', 0):.6f}")
+        print("=" * 55)
 
 
 class ReconstructionCheckpointCallback(TrainingCallback):
     """
     Save best model checkpoint based on validation loss.
-
-    Uses the project's existing ModelCheckpoint logic but wired
-    into EGX's callback lifecycle. Also saves config snapshots
-    for experiment tracking.
     """
 
     def __init__(self, save_path: str = config.BEST_MODEL_PATH):
@@ -134,18 +107,17 @@ class ReconstructionCheckpointCallback(TrainingCallback):
                     "metrics":    metrics,
                 }, self.save_path)
                 config.save_snapshot()
-                logger.info(
+
+                # Fixed for Windows console (replaced ∞ with "inf")
+                print(
                     f"[EGX Checkpoint] val_loss "
-                    f"{'∞' if prev is None else f'{prev:.6f}'} → {val_loss:.6f}"
+                    f"{'inf' if prev is None else f'{prev:.6f}'} → {val_loss:.6f}"
                 )
 
 
 class LRSchedulerEGXCallback(TrainingCallback):
     """
     Wraps ReduceLROnPlateau into the EGX callback lifecycle.
-
-    Called after each evaluation round to step the scheduler
-    based on validation loss.
     """
 
     def __init__(self, optimizer: torch.optim.Optimizer):
@@ -153,7 +125,7 @@ class LRSchedulerEGXCallback(TrainingCallback):
             optimizer, mode="min",
             factor=config.LR_SCHEDULER_FACTOR,
             patience=config.LR_SCHEDULER_PATIENCE,
-            min_lr=1e-6, verbose=False,
+            min_lr=1e-6,
         )
         self._optimizer = optimizer
         self._prev_lr = optimizer.param_groups[0]["lr"]
@@ -165,7 +137,7 @@ class LRSchedulerEGXCallback(TrainingCallback):
         self._scheduler.step(val_loss)
         lr = self._optimizer.param_groups[0]["lr"]
         if lr < self._prev_lr:
-            logger.info(f"[EGX LRScheduler] LR {self._prev_lr:.2e} → {lr:.2e}")
+            print(f"[EGX LRScheduler] LR {self._prev_lr:.2e} → {lr:.2e}")
             self._prev_lr = lr
 
 
@@ -177,14 +149,6 @@ class LRSchedulerEGXCallback(TrainingCallback):
 class EGXAutoencoderTrainer:
     """
     Production-grade autoencoder trainer powered by EGX.
-
-    Wraps the existing training loop with EGX's orchestration engine,
-    providing automatic hardware optimization, self-healing checkpoints,
-    NaN detection, and callback-driven lifecycle hooks.
-
-    Usage:
-        trainer = EGXAutoencoderTrainer(model, train_loader, val_loader)
-        history = trainer.fit()
     """
 
     def __init__(
@@ -232,19 +196,32 @@ class EGXAutoencoderTrainer:
             checkpoint_strategy="adaptive",
         )
 
-        logger.info("[EGX] Trainer initialized with production-grade features")
-        logger.info(f"[EGX] Config: {self._egx_config}")
+        print("[EGX] Trainer initialized with production-grade features")
+        print(f"[EGX] Config: {self._egx_config}")
 
     def _run_epoch(self, loader: DataLoader, training: bool) -> float:
-        """Run a single train or validation epoch."""
+        """Run a single train or validation epoch with detailed progress tracking."""
         self.model.train(training)
-        total = 0.0
-        ctx   = torch.enable_grad() if training else torch.no_grad()
-        desc  = "  Train" if training else "  Val  "
+        total_loss = 0.0
+        num_batches = len(loader)
+        total_samples = len(loader.dataset)
+        samples_processed = 0
+        batch_times = []
+
+        phase_name = "Training" if training else "Validation"
+        print(f"\n  [EGX] {phase_name} Phase ({num_batches} batches, {total_samples} samples)")
+
+        ctx = torch.enable_grad() if training else torch.no_grad()
+        start_time = time.time()
 
         with ctx:
-            for images, _ in tqdm(loader, desc=desc, leave=False, ncols=80):
+            for batch_idx, (images, _) in enumerate(loader, 1):
+                batch_start = time.time()
+
                 images = images.to(self.device, non_blocking=True)
+                batch_size = images.size(0)
+                samples_processed += batch_size
+
                 x_hat, _ = self.model(images)
                 loss = self.loss_fn(x_hat, images)
 
@@ -254,22 +231,50 @@ class EGXAutoencoderTrainer:
                     nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                     self.optimizer.step()
 
-                total += loss.item()
+                # Calculate batch metrics
+                batch_loss = loss.item()
+                total_loss += batch_loss
+                batch_time = time.time() - batch_start
+                batch_times.append(batch_time)
 
-        return total / len(loader)
+                # Calculate progress metrics
+                elapsed_time = time.time() - start_time
+                avg_batch_time = sum(batch_times) / len(batch_times)
+                remaining_batches = num_batches - batch_idx
+                eta_seconds = remaining_batches * avg_batch_time
+
+                # Show detailed batch progress (less frequent for validation)
+                print_interval = 5 if training else 10  # Print every 5 training batches, every 10 validation batches
+                if batch_idx % print_interval == 0 or batch_idx == num_batches:
+                    progress_pct = (batch_idx / num_batches) * 100
+                    if training:
+                        print(f"    [EGX] Batch {batch_idx:2d}/{num_batches} "
+                              f"[{progress_pct:5.1f}%] | "
+                              f"Loss: {batch_loss:.6f} | "
+                              f"Images: {samples_processed}/{total_samples} | "
+                              f"Time: {batch_time:.3f}s | "
+                              f"ETA: {eta_seconds/60:.1f}m")
+                    else:
+                        print(f"    [EGX] Val Batch {batch_idx:2d}/{num_batches} "
+                              f"[{progress_pct:5.1f}%] | "
+                              f"Loss: {batch_loss:.6f}")
+
+        avg_loss = total_loss / num_batches
+        total_time = time.time() - start_time
+
+        if training:
+            print(f"  [EGX] Training Complete - Avg Loss: {avg_loss:.6f} | "
+                  f"Total Time: {total_time:.2f}s | "
+                  f"Avg Batch Time: {sum(batch_times)/len(batch_times):.3f}s")
+        else:
+            print(f"  [EGX] Validation Complete - Avg Loss: {avg_loss:.6f} | "
+                  f"Total Time: {total_time:.2f}s")
+
+        return avg_loss
 
     def fit(self) -> Dict[str, List[float]]:
         """
         Run the full EGX-orchestrated training loop.
-
-        This method uses EGX's callback system for lifecycle management
-        while running the autoencoder's custom train/val loop internally.
-        The EGX callbacks handle:
-          - Logging (AutoencoderLoggingCallback)
-          - Checkpointing (ReconstructionCheckpointCallback)
-          - LR scheduling (LRSchedulerEGXCallback)
-          - Early stopping (EarlyStoppingCallback)
-          - NaN detection (NaNDetectionCallback)
         """
         # ── Build EGX Callback Stack ──
         callbacks = [
@@ -279,7 +284,6 @@ class EGXAutoencoderTrainer:
             NaNDetectionCallback(halt_on_nan=False, max_nan_count=10),
         ]
 
-        # Simulate EGX callback handler for lifecycle events
         from egx.api.callbacks import CallbackHandler, EarlyStoppingCallback as EGXES
         cb_handler = CallbackHandler(callbacks)
 
@@ -293,35 +297,64 @@ class EGXAutoencoderTrainer:
         cb_handler.add(es_cb)
 
         # ── Fire: on_train_begin ──
-        # Using a lightweight trainer-like reference for callbacks
         trainer_ref = self
-        trainer_ref._model = self.model  # EGX callbacks access trainer._model
+        trainer_ref._model = self.model
         cb_handler.fire("on_train_begin", trainer=trainer_ref)
 
-        logger.info(f"[EGX] Device: {self.device}  |  Loss: {config.LOSS_FUNCTION}")
-        logger.info(f"[EGX] Epochs: {config.EPOCHS}  |  Batch: {config.BATCH_SIZE}")
-        logger.info(f"[EGX] Early stopping patience: {config.EARLY_STOP_PATIENCE}")
+        # Calculate dataset statistics
+        train_samples = len(self.train_loader.dataset)
+        val_samples = len(self.val_loader.dataset)
+        train_batches = len(self.train_loader)
+        val_batches = len(self.val_loader)
+
+        print("=" * 80)
+        print("  EGX POWERED PULMONARY ANOMALY DETECTION - TRAINING SESSION")
+        print("=" * 80)
+        print(f"  Device: {self.device}")
+        print(f"  Loss Function: {config.LOSS_FUNCTION}")
+        print(f"  Total Epochs: {config.EPOCHS}")
+        print(f"  Batch Size: {config.BATCH_SIZE}")
+        print(f"  Learning Rate: {config.LEARNING_RATE}")
+        print(f"  Weight Decay: {config.WEIGHT_DECAY}")
+        print(f"  Early Stopping Patience: {config.EARLY_STOP_PATIENCE}")
+        print()
+        print("  DATASET STATISTICS:")
+        print(f"    Training: {train_samples} samples ({train_batches} batches)")
+        print(f"    Validation: {val_samples} samples ({val_batches} batches)")
+        print(f"    Samples per batch: {config.BATCH_SIZE}")
+        print()
+        print("  MODEL INFO:")
+        total_params = sum(p.numel() for p in self.model.parameters())
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        print(f"    Total parameters: {total_params:,}")
+        print(f"    Trainable parameters: {trainable_params:,}")
+        print(f"    Model size: ~{total_params * 4 / (1024**2):.2f} MB")
+        print()
+
+        print("=" * 80)
 
         t0 = time.time()
 
         for epoch in range(config.EPOCHS):
-            # ── Fire: on_epoch_begin ──
+            epoch_start = time.time()
+            
             cb_handler.fire("on_epoch_begin", trainer=trainer_ref, epoch=epoch)
 
-            # ── Training Phase ──
+            # Training Phase
             train_loss = self._run_epoch(self.train_loader, training=True)
 
-            # ── Validation Phase ──
+            # Validation Phase
             val_loss = self._run_epoch(self.val_loader, training=False)
 
             lr = self.optimizer.param_groups[0]["lr"]
+            epoch_time = time.time() - epoch_start
 
-            # ── Record History ──
+            # Record History
             self.history["train_loss"].append(train_loss)
             self.history["val_loss"].append(val_loss)
             self.history["lr"].append(lr)
 
-            # ── EGX Epoch Metrics ──
+            # EGX Epoch Metrics
             epoch_metrics = {
                 "train_loss_epoch": train_loss,
                 "val_loss": val_loss,
@@ -329,30 +362,44 @@ class EGXAutoencoderTrainer:
                 "epoch": epoch + 1,
             }
 
-            # ── Fire: on_epoch_end ──
+            # Detailed epoch summary
+            best_train_loss = min(self.history["train_loss"]) if self.history["train_loss"] else float('inf')
+            best_val_loss = min(self.history["val_loss"]) if self.history["val_loss"] else float('inf')
+
+            print(f"\n{'='*80}")
+            print(f"[EGX] Epoch [{epoch + 1:03d}/{config.EPOCHS}] - Total Time: {epoch_time:.2f}s")
+            print(f"{'='*80}")
+            print(f"  Training Loss: {train_loss:.6f} (avg per batch)")
+            print(f"  Validation Loss: {val_loss:.6f} (avg per batch)")
+            print(f"  Learning Rate: {lr:.2e}")
+            print(f"  Best Training Loss: {best_train_loss:.6f}")
+            print(f"  Best Validation Loss: {best_val_loss:.6f}")
+            print(f"  Progress: {epoch + 1}/{config.EPOCHS} epochs ({(epoch + 1)/config.EPOCHS*100:.1f}%)")
+            print(f"  Samples Processed: {train_samples + val_samples:,} total")
+            print(f"  Batches Processed: {train_batches + val_batches} total")
+            print(f"{'='*80}")
+
             cb_handler.fire(
                 "on_epoch_end", trainer=trainer_ref,
                 epoch=epoch, metrics=epoch_metrics,
             )
 
-            # ── Fire: on_evaluate_end (triggers checkpoint + LR scheduler) ──
+            # Fire evaluate end (checkpoint + scheduler)
             eval_metrics = {"eval_loss": val_loss, "val_loss": val_loss}
             cb_handler.fire(
                 "on_evaluate_end", trainer=trainer_ref, metrics=eval_metrics,
             )
 
-            # ── NaN Detection via callback step hook ──
             cb_handler.fire(
                 "on_step_end", trainer=trainer_ref,
                 step=epoch, loss=train_loss, lr=lr,
             )
 
-            # ── Check EGX Early Stopping ──
+            # Early stopping check
             if es_cb.should_stop:
-                logger.info(
-                    f"[EGX] Early stopping triggered at epoch {epoch + 1}. "
-                    f"Best eval_loss: {es_cb.best_value:.6f}"
-                )
+                print(f"\n[EGX] Early stopping triggered at epoch {epoch + 1}!")
+                print(f"[EGX] Best validation loss: {es_cb.best_value:.6f}")
+                print(f"[EGX] No improvement for {config.EARLY_STOP_PATIENCE} epochs")
                 break
 
         # ── Fire: on_train_end ──
@@ -365,8 +412,18 @@ class EGXAutoencoderTrainer:
         }
         cb_handler.fire("on_train_end", trainer=trainer_ref, result=result)
 
-        logger.info(
-            f"[EGX] Training complete. {result['duration_s'] / 60:.1f} min. "
-            f"Best val loss: {best_val:.6f}"
-        )
+        total_time = result['duration_s']
+        epochs_completed = result['epochs_completed']
+
+        print("\n" + "=" * 80)
+        print("  EGX TRAINING COMPLETED")
+        print("=" * 80)
+        print(f"  Total training time: {total_time/60:.2f} minutes ({total_time:.2f} seconds)")
+        print(f"  Epochs completed: {epochs_completed}/{config.EPOCHS}")
+        print(f"  Best validation loss: {best_val:.6f}")
+        print(f"  Final training loss: {self.history['train_loss'][-1]:.6f}")
+        print(f"  Final validation loss: {self.history['val_loss'][-1]:.6f}")
+        print(f"  Average epoch time: {total_time/epochs_completed:.2f} seconds")
+        print(f"  Best model saved to: {config.BEST_MODEL_PATH}")
+        print("=" * 80)
         return self.history

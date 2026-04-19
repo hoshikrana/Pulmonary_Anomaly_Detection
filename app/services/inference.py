@@ -20,12 +20,11 @@ from PIL import Image
 
 import config
 from src.model   import ConvAutoencoder
-from src.utils   import get_device, get_logger
+from src.utils   import get_device
 from app.services.image_processor import (
     bytes_to_pil, pil_to_tensor, tensor_to_b64_png, pil_to_b64_png,
 )
 
-logger = get_logger(__name__)
 
 # ── Default thresholds (overwritten by load from disk) ────────────
 _DEFAULT_THRESHOLD_NORMAL  = 0.015
@@ -35,7 +34,7 @@ _DEFAULT_THRESHOLD_ANOMALY = 0.040
 def _load_thresholds() -> tuple:
     """Load data-driven thresholds from thresholds.json (written by evaluate.py)."""
     if not config.THRESHOLDS_PATH or not __import__("os").path.exists(config.THRESHOLDS_PATH):
-        logger.warning(
+        print(
             "thresholds.json not found. Using default placeholders. "
             "Run scripts/evaluate.py after training."
         )
@@ -45,7 +44,7 @@ def _load_thresholds() -> tuple:
         t = json.load(f)
     normal  = float(t.get("threshold_normal",  _DEFAULT_THRESHOLD_NORMAL))
     anomaly = float(t.get("threshold_anomaly", _DEFAULT_THRESHOLD_ANOMALY))
-    logger.info(f"Thresholds loaded — normal={normal:.6f}, anomaly={anomaly:.6f}")
+    print(f"Thresholds loaded — normal={normal:.6f}, anomaly={anomaly:.6f}")
     return normal, anomaly
 
 
@@ -67,7 +66,7 @@ class InferenceService:
     def _load_model(self) -> None:
         import os
         if not os.path.exists(config.BEST_MODEL_PATH):
-            logger.warning(
+            print(
                 f"No checkpoint at {config.BEST_MODEL_PATH}. "
                 "Run scripts/train.py first."
             )
@@ -76,9 +75,9 @@ class InferenceService:
             self._model = ConvAutoencoder.load(config.BEST_MODEL_PATH,
                                                device=self._device)
             self._ready = True
-            logger.info(f"Model loaded from {config.BEST_MODEL_PATH}")
+            print(f"Model loaded from {config.BEST_MODEL_PATH}")
         except Exception as e:
-            logger.error(f"Failed to load model: {e}")
+            print(f"Failed to load model: {e}")
 
     def is_ready(self) -> bool:
         return self._ready

@@ -24,9 +24,6 @@ from sklearn.metrics import (
 )
 
 import config
-from src.utils import get_logger
-
-logger = get_logger(__name__)
 
 
 @dataclass
@@ -65,19 +62,19 @@ class EvaluationResult:
     anomaly_scores: np.ndarray = field(default_factory=lambda: np.array([]))
 
     def log_summary(self) -> None:
-        logger.info("=" * 50)
-        logger.info("  Evaluation Results")
-        logger.info("=" * 50)
-        logger.info(f"  AUC-ROC     : {self.auc_roc:.4f}")
-        logger.info(f"  AUC-PR      : {self.auc_pr:.4f}")
-        logger.info(f"  Threshold   : {self.threshold:.6f}")
-        logger.info(f"  Accuracy    : {self.accuracy:.4f}")
-        logger.info(f"  F1          : {self.f1:.4f}")
-        logger.info(f"  Precision   : {self.precision:.4f}")
-        logger.info(f"  Recall      : {self.recall:.4f}")
-        logger.info(f"  Specificity : {self.specificity:.4f}")
-        logger.info(f"  TP={self.tp} TN={self.tn} FP={self.fp} FN={self.fn}")
-        logger.info("=" * 50)
+        print("=" * 50)
+        print("  Evaluation Results")
+        print("=" * 50)
+        print(f"  AUC-ROC     : {self.auc_roc:.4f}")
+        print(f"  AUC-PR      : {self.auc_pr:.4f}")
+        print(f"  Threshold   : {self.threshold:.6f}")
+        print(f"  Accuracy    : {self.accuracy:.4f}")
+        print(f"  F1          : {self.f1:.4f}")
+        print(f"  Precision   : {self.precision:.4f}")
+        print(f"  Recall      : {self.recall:.4f}")
+        print(f"  Specificity : {self.specificity:.4f}")
+        print(f"  TP={self.tp} TN={self.tn} FP={self.fp} FN={self.fn}")
+        print("=" * 50)
 
     def to_dict(self) -> dict:
         return {
@@ -158,7 +155,7 @@ def save_metrics_csv(result: EvaluationResult, path: str) -> None:
         w = csv.DictWriter(f, fieldnames=d.keys())
         w.writeheader()
         w.writerow(d)
-    logger.info(f"Metrics CSV saved: {path}")
+    print(f"Metrics CSV saved: {path}")
 
 
 def save_thresholds(result: EvaluationResult) -> None:
@@ -182,7 +179,7 @@ def save_thresholds(result: EvaluationResult) -> None:
     os.makedirs(os.path.dirname(config.THRESHOLDS_PATH), exist_ok=True)
     with open(config.THRESHOLDS_PATH, "w") as f:
         json.dump(thresh, f, indent=2)
-    logger.info(f"Thresholds saved: {config.THRESHOLDS_PATH}")
-    logger.info(f"  threshold_normal  = {thresh['threshold_normal']}")
-    logger.info(f"  threshold_anomaly = {thresh['threshold_anomaly']}")
-    logger.info(f"  youden            = {thresh['youden']}")
+    print(f"Thresholds saved: {config.THRESHOLDS_PATH}")
+    print(f"  threshold_normal  = {thresh['threshold_normal']}")
+    print(f"  threshold_anomaly = {thresh['threshold_anomaly']}")
+    print(f"  youden            = {thresh['youden']}")

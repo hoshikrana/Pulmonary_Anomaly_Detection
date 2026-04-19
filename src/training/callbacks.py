@@ -13,9 +13,6 @@ import torch
 import torch.nn as nn
 
 import config
-from src.utils import get_logger
-
-logger = get_logger(__name__)
 
 
 class EarlyStopping:
@@ -39,10 +36,10 @@ class EarlyStopping:
             self.counter    = 0
         else:
             self.counter += 1
-            logger.info(f"[EarlyStopping] {self.counter}/{self.patience} "
+            print(f"[EarlyStopping] {self.counter}/{self.patience} "
                         f"(best={self.best_score:.6f})")
             if self.counter >= self.patience:
-                logger.info(f"[EarlyStopping] Triggered at epoch {epoch}.")
+                print(f"[EarlyStopping] Triggered at epoch {epoch}.")
                 self.stop = True
 
         return self.stop
@@ -76,7 +73,7 @@ class ModelCheckpoint:
             # Save config snapshot alongside checkpoint for experiment tracking
             config.save_snapshot()
 
-            logger.info(
+            print(
                 f"[Checkpoint] Epoch {epoch:03d} — "
                 f"val_loss {'∞' if prev is None else f'{prev:.6f}'} → {score:.6f}"
             )
@@ -93,7 +90,7 @@ class LRSchedulerCallback:
                  min_lr: float  = 1e-6):
         self._scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode="min", factor=factor,
-            patience=patience, min_lr=min_lr, verbose=False,
+            patience=patience, min_lr=min_lr
         )
         self._optimizer = optimizer
         self._prev_lr   = self._lr()
@@ -108,6 +105,6 @@ class LRSchedulerCallback:
         self._scheduler.step(val_loss)
         lr = self._lr()
         if lr < self._prev_lr:
-            logger.info(f"[LRScheduler] Epoch {epoch:03d} — "
+            print(f"[LRScheduler] Epoch {epoch:03d} — "
                         f"LR {self._prev_lr:.2e} → {lr:.2e}")
             self._prev_lr = lr
