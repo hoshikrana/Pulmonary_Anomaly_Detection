@@ -14,7 +14,6 @@ Retraining: If best_model.pth exists, training continues from saved weights.
 
 import sys
 import os
-from datetime import datetime
 
 # Ensure the project root is in the Python path before importing config
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -28,42 +27,14 @@ from src.model      import ConvAutoencoder
 from src.evaluation import plot_training_curves
 
 
-class TerminalLogger:
-    """Logs all terminal output to both stdout and a file."""
-    def __init__(self, log_file):
-        self.terminal = sys.stdout
-        self.log = open(log_file, 'w')
-    
-    def write(self, message):
-        self.terminal.write(message)
-        self.log.write(message)
-        self.log.flush()
-    
-    def flush(self):
-        self.terminal.flush()
-        self.log.flush()
-    
-    def close(self):
-        self.log.close()
-
-
 def main():
     use_egx = "--egx" in sys.argv
-
-    # Setup terminal logging
-    log_dir = os.path.join(config.OUTPUT_DIR, "logs")
-    os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, f"training_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
-    logger = TerminalLogger(log_file)
-    sys.stdout = logger
 
     print("\n" + "=" * 70)
     print("  PULMONARY ANOMALY DETECTION - TRAINING SCRIPT")
     print("=" * 70)
     print(f"  Mode: {'EGX Powered' if use_egx else 'Vanilla'} Training")
     print(f"  Random Seed: {config.SEED}")
-    print("=" * 70)
-    print(f"  Terminal output saved to: {log_file}")
     print("=" * 70)
 
     set_seed(config.SEED)
@@ -118,22 +89,7 @@ def main():
     print("\n" + "=" * 70)
     print("  TRAINING SCRIPT COMPLETED SUCCESSFULLY")
     print("=" * 70)
-    print(f"✓ Terminal log saved to: {log_file}")
-    print("=" * 70)
-    
-    # Close the logger
-    sys.stdout = logger.terminal
-    logger.close()
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f"\n[ERROR] Training failed: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        # Restore stdout and close logger on error
-        if hasattr(sys.stdout, 'terminal'):
-            sys.stdout.close()
-            sys.stdout = sys.stdout.terminal
+    main()
