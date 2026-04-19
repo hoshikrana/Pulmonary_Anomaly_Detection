@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Error {{ code }} — Pulmonary Anomaly Detection{% endblock %}
+
+{% block content %}
+<div class="error-page">
+  <div class="error-code">{{ code }}</div>
+  <p class="error-message">{{ message }}</p>
+  <a href="/" class="btn btn-primary">Go home</a>
+</div>
+{% endblock %}

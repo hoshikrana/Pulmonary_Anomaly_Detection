@@ -1,0 +1,38 @@
+# Dataset — never commit (too large)
+data/
+
+# Model weights
+checkpoints/
+*.pth
+
+# Generated outputs
+outputs/
+*.png
+*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Environments
+.env
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Kaggle credentials
+kaggle.json
+~/.kaggle/
+
+# IDE
+.vscode/
+.idea/
+*.swp
