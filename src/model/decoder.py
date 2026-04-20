@@ -1,14 +1,3 @@
-"""
-src/model/decoder.py
-────────────────────
-Decoder: latent vector z → reconstructed image.
-
-DecoderBlock  — ConvTranspose2d(stride=2) + BatchNorm + ReLU
-Decoder       — linear projection + stack of DecoderBlock (final: Tanh)
-
-Tanh output matches normalised input range [-1, 1].
-"""
-
 import torch
 import torch.nn as nn
 import config
@@ -18,13 +7,23 @@ class DecoderBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, is_final: bool = False):
         super().__init__()
         layers = [
-            nn.ConvTranspose2d(in_channels, out_channels,
-                               kernel_size=4, stride=2, padding=1, bias=False),
+            nn.ConvTranspose2d(
+                in_channels,
+                out_channels,
+                kernel_size=4,
+                stride=2,
+                padding=1,
+                bias=False,
+            )
         ]
         if not is_final:
-            layers += [nn.BatchNorm2d(out_channels), nn.ReLU(inplace=True)]
+            layers += [
+                nn.BatchNorm2d(out_channels),
+                nn.ReLU(inplace=True),
+                nn.Dropout2d(p=config.DROPOUT_RATE),
+            ]
         else:
-            layers.append(nn.Tanh())   # output ∈ [-1, 1]
+            layers.append(nn.Tanh())
         self.block = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -33,30 +32,24 @@ class DecoderBlock(nn.Module):
 
 class Decoder(nn.Module):
     """
-    (B, latent_dim) → (B, 1, 128, 128)
-
-    Linear → Reshape(256,8,8) → 8→16→32→64→128 spatial
-    Channels: 256→128→64→32→1, final Tanh
+    latent_dim -> 512x512 image
     """
-
-    RESHAPE_CH  = 256
-    RESHAPE_SP  = 8
-    FLAT_SIZE   = 256 * 8 * 8
-
     def __init__(self, latent_dim: int = config.LATENT_DIM):
         super().__init__()
         self.fc = nn.Sequential(
-            nn.Linear(latent_dim, self.FLAT_SIZE),
+            nn.Linear(latent_dim, 256 * 8 * 8),
             nn.ReLU(inplace=True),
         )
         self.deconv_layers = nn.Sequential(
-            DecoderBlock(256, 128),
-            DecoderBlock(128, 64),
-            DecoderBlock(64,  32),
-            DecoderBlock(32,  1, is_final=True),
+            DecoderBlock(256, 256),   # 8 -> 16
+            DecoderBlock(256, 128),   # 16 -> 32
+            DecoderBlock(128, 64),    # 32 -> 64
+            DecoderBlock(64, 32),     # 64 -> 128
+            DecoderBlock(32, 16),     # 128 -> 256
+            DecoderBlock(16, 1, is_final=True),  # 256 -> 512
         )
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         x = self.fc(z)
-        x = x.view(x.size(0), self.RESHAPE_CH, self.RESHAPE_SP, self.RESHAPE_SP)
+        x = x.view(x.size(0), 256, 8, 8)
         return self.deconv_layers(x)

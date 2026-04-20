@@ -1,9 +1,6 @@
 # =============================================================
 # Pulmonary Anomaly Detection in Chest Radiographs
-# config.py — Central configuration. Pure data, no side effects.
-# =============================================================
-# Rule: importing config must never trigger heavy operations.
-# Device detection lives in src/utils/device.py.
+# config.py — HIGH-RES + SMALLER LATENT DIM
 # =============================================================
 
 import os
@@ -28,30 +25,31 @@ THRESHOLDS_PATH     = os.path.join(OUTPUT_DIR,     "thresholds.json")
 CONFIG_SNAPSHOT_PATH = os.path.join(OUTPUT_DIR,    "config_snapshot.json")
 
 # ------------------------------------------------------------------
-# Image settings
+# Image settings — ORIGINAL SIZE PRESERVED
 # ------------------------------------------------------------------
-IMG_SIZE     = 128
+IMG_SIZE     = 512
 IMG_CHANNELS = 1
 IMG_MEAN     = (0.5,)
 IMG_STD      = (0.5,)
 
 # ------------------------------------------------------------------
-# Model architecture
+# Model
 # ------------------------------------------------------------------
-LATENT_DIM = 128
+LATENT_DIM   = 64            # ← Reduced as you asked (better compression)
+DROPOUT_RATE = 0.25
 
 # ------------------------------------------------------------------
-# Training
+# Training (GPU ready)
 # ------------------------------------------------------------------
-BATCH_SIZE   = 32
-NUM_WORKERS  = 2
+BATCH_SIZE   = 32            # ← Increase to 64 or 128 if your friend's GPU has enough VRAM
+NUM_WORKERS  = 4
 PIN_MEMORY   = True
 
-LEARNING_RATE           = 0.1
-WEIGHT_DECAY            = 0.1
-EPOCHS                  = 100
+LEARNING_RATE           = 0.001
+WEIGHT_DECAY            = 1e-4
+EPOCHS                  = 80
 EARLY_STOP_PATIENCE     = 8
-LR_SCHEDULER_PATIENCE   = 4
+LR_SCHEDULER_PATIENCE   = 5
 LR_SCHEDULER_FACTOR     = 0.5
 
 VAL_SPLIT    = 0.2
@@ -60,22 +58,17 @@ SEED         = 42
 # ------------------------------------------------------------------
 # Loss
 # ------------------------------------------------------------------
-LOSS_FUNCTION = "combined"   # "mse" | "ssim" | "combined"
+LOSS_FUNCTION = "combined"
 
 # ------------------------------------------------------------------
-# Upload limit (single source of truth — used by both Flask and validators)
+# Misc
 # ------------------------------------------------------------------
-MAX_UPLOAD_BYTES = 16 * 1024 * 1024   # 16 MB
+MAX_UPLOAD_BYTES = 16 * 1024 * 1024
 
-# ------------------------------------------------------------------
-# Ensure output directories exist on import
-# ------------------------------------------------------------------
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR,     exist_ok=True)
 
-
 def print_config() -> None:
-    """Print all config values at training start."""
     print("\n" + "=" * 55)
     print("  Pulmonary Anomaly Detection — Configuration")
     print("=" * 55)
@@ -83,20 +76,14 @@ def print_config() -> None:
     print(f"  Latent dim   : {LATENT_DIM}")
     print(f"  Batch size   : {BATCH_SIZE}")
     print(f"  Learning rate: {LEARNING_RATE}")
+    print(f"  Weight decay : {WEIGHT_DECAY}")
     print(f"  Epochs       : {EPOCHS}")
     print(f"  Loss         : {LOSS_FUNCTION}")
-    print(f"  Data dir     : {DATA_DIR}")
-    print(f"  Checkpoints  : {CHECKPOINT_DIR}")
-    print(f"  Outputs      : {OUTPUT_DIR}")
+    print(f"  Dropout      : {DROPOUT_RATE}")
     print("=" * 55 + "\n")
 
-
 def save_snapshot() -> None:
-    """Save a JSON snapshot of all scalar config values for experiment tracking."""
     import json
-    snapshot = {
-        k: v for k, v in globals().items()
-        if not k.startswith("_") and isinstance(v, (int, float, str, tuple, bool))
-    }
+    snapshot = {k: v for k, v in globals().items() if not k.startswith("_") and isinstance(v, (int, float, str, tuple, bool))}
     with open(CONFIG_SNAPSHOT_PATH, "w") as f:
         json.dump(snapshot, f, indent=2)
