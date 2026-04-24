@@ -6,7 +6,7 @@ No loss definitions, no callback logic, no architecture, no data loading.
 """
 
 import time
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import torch
 import torch.nn as nn
@@ -41,11 +41,13 @@ class Trainer:
 
         self.history: Dict[str, List[float]] = {
             "train_loss": [], "val_loss": [], "lr": [],
+            "train_acc": [], "val_acc": [],
         }
 
-    def _run_epoch(self, loader: DataLoader, training: bool) -> float:
+    def _run_epoch(self, loader: DataLoader, training: bool) -> Tuple[float, float]:
         self.model.train(training)
         total_loss = 0.0
+        total_acc = 0.0
         num_batches = len(loader)
         total_samples = len(loader.dataset)
         samples_processed = 0
@@ -77,6 +79,14 @@ class Trainer:
                 # Calculate batch metrics
                 batch_loss = loss.item()
                 total_loss += batch_loss
+                
+                # Calculate pixel-wise reconstruction accuracy proxy
+                # Assuming images are in [-1, 1], shifted to [0, 1] for MAE
+                x_hat_norm = (x_hat + 1) / 2
+                images_norm = (images + 1) / 2
+                batch_acc = 100.0 * (1.0 - torch.mean(torch.abs(x_hat_norm - images_norm)).item())
+                total_acc += batch_acc
+                
                 batch_time = time.time() - batch_start
                 batch_times.append(batch_time)
 
@@ -94,26 +104,29 @@ class Trainer:
                         print(f"    Batch {batch_idx:2d}/{num_batches} "
                               f"[{progress_pct:5.1f}%] | "
                               f"Loss: {batch_loss:.6f} | "
+                              f"Acc: {batch_acc:.2f}% | "
                               f"Images: {samples_processed}/{total_samples} | "
                               f"Time: {batch_time:.3f}s | "
                               f"ETA: {eta_seconds/60:.1f}m")
                     else:
                         print(f"    Val Batch {batch_idx:2d}/{num_batches} "
                               f"[{progress_pct:5.1f}%] | "
-                              f"Loss: {batch_loss:.6f}")
+                              f"Loss: {batch_loss:.6f} | "
+                              f"Acc: {batch_acc:.2f}%")
 
         avg_loss = total_loss / num_batches
+        avg_acc = total_acc / num_batches
         total_time = time.time() - start_time
 
         if training:
-            print(f"  Training Complete - Avg Loss: {avg_loss:.6f} | "
+            print(f"  Training Complete - Avg Loss: {avg_loss:.6f} | Avg Acc: {avg_acc:.2f}% | "
                   f"Total Time: {total_time:.2f}s | "
                   f"Avg Batch Time: {sum(batch_times)/len(batch_times):.3f}s")
         else:
-            print(f"  Validation Complete - Avg Loss: {avg_loss:.6f} | "
+            print(f"  Validation Complete - Avg Loss: {avg_loss:.6f} | Avg Acc: {avg_acc:.2f}% | "
                   f"Total Time: {total_time:.2f}s")
 
-        return avg_loss
+        return avg_loss, avg_acc
 
     def fit(self) -> Dict[str, List[float]]:
         # Calculate dataset statistics
@@ -151,10 +164,10 @@ class Trainer:
             epoch_start = time.time()
 
             # Training phase
-            train_loss = self._run_epoch(self.train_loader, training=True)
+            train_loss, train_acc = self._run_epoch(self.train_loader, training=True)
 
             # Validation phase
-            val_loss = self._run_epoch(self.val_loader, training=False)
+            val_loss, val_acc = self._run_epoch(self.val_loader, training=False)
 
             lr = self.optimizer.param_groups[0]["lr"]
             epoch_time = time.time() - epoch_start
@@ -162,9 +175,11 @@ class Trainer:
             # Record history
             self.history["train_loss"].append(train_loss)
             self.history["val_loss"].append(val_loss)
+            self.history["train_acc"].append(train_acc)
+            self.history["val_acc"].append(val_acc)
             self.history["lr"].append(lr)
 
-            metrics = {"val_loss": val_loss, "train_loss": train_loss, "lr": lr}
+            metrics = {"val_loss": val_loss, "train_loss": train_loss, "val_acc": val_acc, "train_acc": train_acc, "lr": lr}
 
             # Detailed epoch summary
             best_train_loss = min(self.history["train_loss"]) if self.history["train_loss"] else float('inf')
@@ -173,8 +188,8 @@ class Trainer:
             print(f"\n{'='*80}")
             print(f"Epoch [{epoch:03d}/{config.EPOCHS}] - Total Time: {epoch_time:.2f}s")
             print(f"{'='*80}")
-            print(f"  Training Loss: {train_loss:.6f} (avg per batch)")
-            print(f"  Validation Loss: {val_loss:.6f} (avg per batch)")
+            print(f"  Training Loss: {train_loss:.6f} | Accuracy: {train_acc:.2f}%")
+            print(f"  Validation Loss: {val_loss:.6f} | Accuracy: {val_acc:.2f}%")
             print(f"  Learning Rate: {lr:.2e}")
             print(f"  Best Training Loss: {best_train_loss:.6f}")
             print(f"  Best Validation Loss: {best_val_loss:.6f}")
@@ -202,8 +217,8 @@ class Trainer:
         print(f"  Total training time: {total_time/60:.2f} minutes ({total_time:.2f} seconds)")
         print(f"  Epochs completed: {epochs_completed}/{config.EPOCHS}")
         print(f"  Best validation loss: {best_val_loss:.6f}")
-        print(f"  Final training loss: {self.history['train_loss'][-1]:.6f}")
-        print(f"  Final validation loss: {self.history['val_loss'][-1]:.6f}")
+        print(f"  Final training loss: {self.history['train_loss'][-1]:.6f} | Acc: {self.history['train_acc'][-1]:.2f}%")
+        print(f"  Final validation loss: {self.history['val_loss'][-1]:.6f} | Acc: {self.history['val_acc'][-1]:.2f}%")
         print(f"  Average epoch time: {total_time/epochs_completed:.2f} seconds")
         print(f"  Best model saved to: {config.BEST_MODEL_PATH}")
         print("=" * 80)

@@ -48,7 +48,7 @@ class AnomalyScorer:
 
         for images, labels in tqdm(loader, desc=f"  {desc}", ncols=80, leave=False):
             images = images.to(self.device, non_blocking=True)
-            x_hat, _ = self.model(images)
+            x_hat, _, _, _ = self.model(images)
             mse = ((images - x_hat) ** 2).mean(dim=[1, 2, 3])
             all_scores.append(mse.cpu().numpy())
             all_labels.append(labels.numpy())
@@ -75,7 +75,7 @@ class AnomalyScorer:
             x_hat     : (1, C, H, W) reconstruction
         """
         image_tensor = image_tensor.to(self.device)
-        x_hat, _     = self.model(image_tensor)
+        x_hat, _, _, _ = self.model(image_tensor)
         error_map    = ((image_tensor - x_hat) ** 2).squeeze()
         return error_map.mean().item(), error_map, x_hat
 

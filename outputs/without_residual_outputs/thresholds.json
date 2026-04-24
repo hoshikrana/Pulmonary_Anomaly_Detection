@@ -1,0 +1,5 @@
+{
+  "youden": 0.000333,
+  "threshold_normal": 0.000764,
+  "threshold_anomaly": 0.002312
+}

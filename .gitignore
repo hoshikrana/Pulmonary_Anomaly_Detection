@@ -6,9 +6,9 @@ checkpoints/
 *.pth
 
 # Generated outputs
-outputs/
-*.png
-*.csv
+# outputs/ is now tracked as per user request
+# *.png
+# *.csv
 
 # Python
 __pycache__/
@@ -23,6 +23,7 @@ build/
 .env
 .venv/
 venv/
+venv312/
 
 # Jupyter
 .ipynb_checkpoints/

@@ -1,0 +1,42 @@
+{
+  "BASE_DIR": "C:\\Users\\manoj\\Desktop\\Pulmonary_Anomaly_Detection",
+  "DATA_DIR": "C:\\Users\\manoj\\Desktop\\Pulmonary_Anomaly_Detection\\data\\chest_xray",
+  "CHECKPOINT_DIR": "C:\\Users\\manoj\\Desktop\\Pulmonary_Anomaly_Detection\\checkpoints",
+  "OUTPUT_DIR": "C:\\Users\\manoj\\Desktop\\Pulmonary_Anomaly_Detection\\outputs",
+  "TRAIN_NORMAL": "C:\\Users\\manoj\\Desktop\\Pulmonary_Anomaly_Detection\\data\\chest_xray\\train\\NORMAL",
+  "TRAIN_PNEUMONIA": "C:\\Users\\manoj\\Desktop\\Pulmonary_Anomaly_Detection\\data\\chest_xray\\train\\PNEUMONIA",
+  "TEST_NORMAL": "C:\\Users\\manoj\\Desktop\\Pulmonary_Anomaly_Detection\\data\\chest_xray\\test\\NORMAL",
+  "TEST_PNEUMONIA": "C:\\Users\\manoj\\Desktop\\Pulmonary_Anomaly_Detection\\data\\chest_xray\\test\\PNEUMONIA",
+  "VAL_NORMAL": "C:\\Users\\manoj\\Desktop\\Pulmonary_Anomaly_Detection\\data\\chest_xray\\val\\NORMAL",
+  "VAL_PNEUMONIA": "C:\\Users\\manoj\\Desktop\\Pulmonary_Anomaly_Detection\\data\\chest_xray\\val\\PNEUMONIA",
+  "BEST_MODEL_PATH": "C:\\Users\\manoj\\Desktop\\Pulmonary_Anomaly_Detection\\checkpoints\\best_model.pth",
+  "THRESHOLDS_PATH": "C:\\Users\\manoj\\Desktop\\Pulmonary_Anomaly_Detection\\outputs\\thresholds.json",
+  "CONFIG_SNAPSHOT_PATH": "C:\\Users\\manoj\\Desktop\\Pulmonary_Anomaly_Detection\\outputs\\config_snapshot.json",
+  "IMG_SIZE": 512,
+  "IMG_CHANNELS": 1,
+  "IMG_MEAN": [
+    0.5
+  ],
+  "IMG_STD": [
+    0.5
+  ],
+  "LATENT_DIM": 256,
+  "DROPOUT_RATE": 0.25,
+  "BATCH_SIZE": 16,
+  "NUM_WORKERS": 4,
+  "PIN_MEMORY": true,
+  "GRAD_ACCUM_STEPS": 4,
+  "LEARNING_RATE": 0.0001,
+  "WEIGHT_DECAY": 0.0001,
+  "EPOCHS": 30,
+  "EARLY_STOP_PATIENCE": 8,
+  "LR_SCHEDULER_PATIENCE": 5,
+  "LR_SCHEDULER_FACTOR": 0.5,
+  "VAL_SPLIT": 0.2,
+  "SEED": 42,
+  "LOSS_FUNCTION": "combined",
+  "LOSS_ALPHA": 0.7,
+  "KL_BETA_MAX": 0.0005,
+  "KL_WARMUP_EPOCHS": 5,
+  "MAX_UPLOAD_BYTES": 16777216
+}

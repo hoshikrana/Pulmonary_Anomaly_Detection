@@ -1,13 +1,19 @@
 """
 src/model/autoencoder.py
-────────────────────────
-Assembles Encoder + Decoder into ConvAutoencoder.
-Handles weight initialisation, forward pass, checkpoint save/load.
+─────────────────────────
+ConvAutoencoder: assembles Encoder + Decoder.
+
+forward() returns: x_hat, z, mu, logvar
+  - x_hat : reconstruction (B, 1, 512, 512)
+  - z      : sampled latent (B, LATENT_DIM)
+  - mu     : latent mean    (B, LATENT_DIM)  — for KL loss
+  - logvar : log-variance   (B, LATENT_DIM)  — for KL loss
+
+encode() returns only z (mu at eval time) — used by anomaly_scorer.
+reconstruction_error() returns per-image MSE — the anomaly score.
 """
 
 import os
-from typing import Tuple
-
 import torch
 import torch.nn as nn
 
@@ -17,12 +23,6 @@ from src.model.decoder import Decoder
 
 
 class ConvAutoencoder(nn.Module):
-    """
-    Convolutional Autoencoder for unsupervised pulmonary anomaly detection.
-
-    Train on normal X-rays only → minimise reconstruction loss.
-    Inference → high reconstruction error == anomaly.
-    """
 
     def __init__(self, latent_dim: int = config.LATENT_DIM):
         super().__init__()
@@ -32,11 +32,7 @@ class ConvAutoencoder(nn.Module):
         self._init_weights()
 
     def _init_weights(self) -> None:
-        """
-        Kaiming normal for Conv (optimal for LeakyReLU).
-        Xavier normal for Linear (optimal for unbounded output).
-        BatchNorm: weight=1, bias=0.
-        """
+        """Kaiming for Conv/ConvTranspose, Xavier for Linear, ones/zeros for BN."""
         for m in self.modules():
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out",
@@ -51,37 +47,43 @@ class ConvAutoencoder(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
+    def forward(self, x: torch.Tensor):
+        """
+        Args:   x     (B, 1, 512, 512)
+        Returns x_hat (B, 1, 512, 512)
+                z     (B, LATENT_DIM)
+                mu    (B, LATENT_DIM)
+                logvar(B, LATENT_DIM)
+        """
+        z, mu, logvar, skips = self.encoder(x)
+        x_hat = self.decoder(z, skips)
+        return x_hat, z, mu, logvar
+
     def encode(self, x: torch.Tensor) -> torch.Tensor:
-        return self.encoder(x)
-
-    def decode(self, z: torch.Tensor) -> torch.Tensor:
-        return self.decoder(z)
-
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Returns:
-            x_hat : (B, 1, IMG_SIZE, IMG_SIZE) reconstruction
-            z     : (B, latent_dim) latent vector
+        Returns deterministic latent code (mu) for t-SNE / PCA analysis.
+        Called by anomaly_scorer.extract_latent_vectors().
         """
-        z     = self.encode(x)
-        x_hat = self.decode(z)
-        return x_hat, z
+        _, mu, _, _ = self.encoder(x)
+        return mu
 
     @torch.no_grad()
     def reconstruction_error(self, x: torch.Tensor) -> torch.Tensor:
-        """Per-image MSE anomaly scores. Shape: (B,)."""
+        """
+        Per-image MSE anomaly score. Shape: (B,)
+        Uses mu (no sampling noise) for a stable, deterministic score.
+        """
         was_training = self.training
         self.eval()
-        x_hat, _ = self.forward(x)
-        errors   = ((x - x_hat) ** 2).mean(dim=[1, 2, 3])
+        x_hat, _, _, _ = self.forward(x)
+        errors = ((x - x_hat) ** 2).mean(dim=[1, 2, 3])
         if was_training:
             self.train()
         return errors
 
-    # ── Checkpoint I/O ────────────────────────────────────────────
+    # ── Checkpoint I/O ────────────────────────────────────────────────────────
 
     def save(self, path: str) -> None:
-        """Save model checkpoint to path."""
         os.makedirs(os.path.dirname(path), exist_ok=True)
         torch.save({
             "latent_dim": self.latent_dim,
@@ -89,14 +91,11 @@ class ConvAutoencoder(nn.Module):
         }, path)
 
     @classmethod
-    def load(cls, path: str, device: torch.device = None) -> "ConvAutoencoder":
-        """Load checkpoint. Returns model in eval mode."""
+    def load(cls, path: str,
+             device: torch.device = None) -> "ConvAutoencoder":
         if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        # weights_only=False required because we save a dict with metadata
-        checkpoint = torch.load(path, map_location=device, weights_only=False)
-        model = cls(latent_dim=checkpoint["latent_dim"])
-        model.load_state_dict(checkpoint["state_dict"])
-        model.to(device)
-        model.eval()
-        return model
+        ckpt  = torch.load(path, map_location=device, weights_only=False)
+        model = cls(latent_dim=ckpt["latent_dim"])
+        model.load_state_dict(ckpt["state_dict"])
+        return model.to(device).eval()

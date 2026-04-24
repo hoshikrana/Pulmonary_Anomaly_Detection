@@ -193,7 +193,7 @@ def plot_latent_space(vectors: np.ndarray, labels: np.ndarray,
         from sklearn.manifold import TSNE
         print("Running t-SNE (1-2 min)...")
         embedded = TSNE(n_components=2, random_state=config.SEED,
-                        perplexity=30, n_iter=1000).fit_transform(scaled)
+                        perplexity=30, max_iter=1000).fit_transform(scaled)
         title = "Latent Space — t-SNE 2D Projection"
     else:
         from sklearn.decomposition import PCA

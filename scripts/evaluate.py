@@ -97,7 +97,7 @@ def _save_image_grids(model, test_loader):
     images, labels = next(iter(test_loader))
     images     = images.to(device)
     with torch.no_grad():
-        x_hat, _ = model(images)
+        x_hat, _, _, _ = model(images)
 
     plot_reconstruction_grid(
         originals=images[:8].cpu(),
